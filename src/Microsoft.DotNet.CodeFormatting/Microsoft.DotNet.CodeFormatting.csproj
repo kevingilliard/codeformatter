@@ -123,6 +123,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="NameHelper.cs" />
+    <Compile Include="ProjectConverter.cs" />
     <Compile Include="ResponseFileWorkspace.cs" />
     <Compile Include="Rules\MarkReadonlyFieldsRule.cs" />
     <Compile Include="SemaphoreLock.cs" />

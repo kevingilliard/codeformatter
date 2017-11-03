@@ -115,7 +115,7 @@ namespace Microsoft.DotNet.CodeFormatting
                 .Select(r => r.Value)
                 .ToList();
         }
-
+      
         public Task FormatSolutionAsync(Solution solution, CancellationToken cancellationToken)
         {
             var documentIds = solution.Projects.SelectMany(x => x.DocumentIds).ToList();
@@ -135,14 +135,32 @@ namespace Microsoft.DotNet.CodeFormatting
         private async Task FormatAsync(Workspace workspace, IReadOnlyList<DocumentId> documentIds, CancellationToken cancellationToken)
         {
             var watch = new Stopwatch();
-            watch.Start();
 
-            var originalSolution = workspace.CurrentSolution;
-            var solution = await FormatCoreAsync(originalSolution, documentIds, cancellationToken);
+            var converter = new ProjectConverter();
 
-            watch.Stop();
+            bool bFailToSave = false;
+            foreach (var project in workspace.CurrentSolution.Projects)
+            {
+                watch.Start();
 
-            if (!workspace.TryApplyChanges(solution))
+                if (converter.NeedsUpdate(project))
+                {
+                    workspace = await converter.UpdateProjectAsync(project, cancellationToken);
+                    documentIds = workspace.CurrentSolution.Projects.First().DocumentIds;
+                }
+
+                var originalSolution = workspace.CurrentSolution;
+                var solution = await FormatCoreAsync(originalSolution, documentIds, cancellationToken);
+
+                watch.Stop();
+
+                if (!workspace.TryApplyChanges(solution))
+                    bFailToSave = true;
+
+                converter.ClearTempFiles();
+            }
+
+            if (bFailToSave)
             {
                 FormatLogger.WriteErrorLine("Unable to save changes to disk");
             }
