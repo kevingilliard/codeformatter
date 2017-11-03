@@ -137,18 +137,28 @@ namespace Microsoft.DotNet.CodeFormatting
             var watch = new Stopwatch();
 
             var converter = new ProjectConverter();
+            var originalWorkspace = workspace;
 
             bool bFailToSave = false;
-            foreach (var project in workspace.CurrentSolution.Projects)
+            foreach (var project in originalWorkspace.CurrentSolution.Projects)
             {
                 watch.Start();
 
+                // Get document list to be formatted
                 if (converter.NeedsUpdate(project))
                 {
+                    // Get documents in converted projects
                     workspace = await converter.UpdateProjectAsync(project, cancellationToken);
                     documentIds = workspace.CurrentSolution.Projects.First().DocumentIds;
                 }
+                else
+                {
+                    // Use documents in current project
+                    workspace = originalWorkspace;
+                    documentIds = project.DocumentIds;
+                }
 
+                // Do format for current project
                 var originalSolution = workspace.CurrentSolution;
                 var solution = await FormatCoreAsync(originalSolution, documentIds, cancellationToken);
 
