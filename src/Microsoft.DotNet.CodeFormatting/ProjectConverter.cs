@@ -18,8 +18,8 @@ namespace Microsoft.DotNet.CodeFormatting
 
     class ProjectConverter
     {
-        private List<string> TempFiles = new List<string>();
         private List<Workspace> TempWorkspaces = new List<Workspace>();
+        private Dictionary<Workspace, string> TempFiles = new Dictionary<Workspace, string>();
 
         readonly string CSharpProjectTemplate = @"<?xml version=""1.0"" encoding=""utf-8""?>
 <Project ToolsVersion=""4.0"" DefaultTargets=""Build"" xmlns=""http://schemas.microsoft.com/developer/msbuild/2003"">
@@ -165,6 +165,25 @@ namespace Microsoft.DotNet.CodeFormatting
             return project.DocumentIds.Count() == 0;
         }
 
+        /// <summary>
+        /// This function is for mono environment only.
+        /// Old version of MSBuild Mono, doesn't load project files which contains '\' as a path separator.
+        /// In that case, we can replace '\' to '/', which is compatible in Windows and Unix both.
+        /// </summary>
+        /// <param name="solution"></param>
+        /// <returns></returns>
+        public bool NeedsUpdate(Solution solution)
+        {
+            if (solution.FilePath == null)
+                return false;
+
+            // Solution file is not a XML file and it contains names, keyworks and GUID only.
+            // If the chatacter '\' is existing, it's used as a path separator.
+            // (Not sure it's correct.  Please update this function if any exception occurs)
+            string solutionBody = File.ReadAllText(solution.FilePath);
+            return solutionBody.Contains('\\');
+        }
+
         public async Task<Workspace> UpdateProjectAsync(Project project, CancellationToken cancellationToken)
         {
             try
@@ -193,7 +212,7 @@ namespace Microsoft.DotNet.CodeFormatting
                     workspace.LoadMetadataForReferencedProjects = true;
                     var newProject = await workspace.OpenProjectAsync(tmpProjectPath, cancellationToken);
 
-                    this.TempFiles.Add(tmpProjectPath);
+                    this.TempFiles.Add(workspace, tmpProjectPath);
                 }
                 this.TempWorkspaces.Add(workspace);
 
@@ -206,19 +225,56 @@ namespace Microsoft.DotNet.CodeFormatting
             }
         }
 
-        public void ClearTempFiles()
+        public async Task<Workspace> UpdateSolutionAsync(Solution solution, CancellationToken cancellationToken)
+        {
+            try
+            {
+                if (NeedsUpdate(solution) == false)
+                {
+                    return solution.Workspace;
+                }
+
+                // Create solution file content and save as temporary file
+                string tmpSolutionPath = solution.FilePath.Insert(solution.FilePath.LastIndexOf('.'), "_tmp");
+                string solutionString = File.ReadAllText(solution.FilePath);
+                solutionString.Replace('\\', '/');
+
+                File.WriteAllText(tmpSolutionPath, solutionString);
+
+                // Load solution from temporary file
+                var workspace = MSBuildWorkspace.Create();
+                {
+                    workspace.LoadMetadataForReferencedProjects = true;
+                    var newSolution = await workspace.OpenSolutionAsync(tmpSolutionPath, cancellationToken);
+
+                    this.TempFiles.Add(workspace, tmpSolutionPath);
+                }
+                this.TempWorkspaces.Add(workspace);
+
+                return workspace;
+            }
+            catch (Exception /*ex*/)
+            {
+                // Debug.WriteLine(ex.Message);
+                return solution.Workspace;
+            }
+        }
+
+        public void ClearWorkspace(Workspace workspace)
         {
             // Clear temporary created workspaces
-            foreach (var workspace in this.TempWorkspaces)
+            if (this.TempWorkspaces.Remove(workspace))
+            {
+                // Delete all temp files associated with project
+                if (this.TempFiles.ContainsKey(workspace))
+                {
+                    File.Delete(this.TempFiles[workspace]);
+                    this.TempFiles.Remove(workspace);
+                }
+
+                // Dispose workspace
                 workspace.Dispose();
-
-            TempWorkspaces.Clear();
-
-            // Delete all temp files and clear list
-            foreach (var tmpFile in this.TempFiles)
-                File.Delete(tmpFile);
-            
-            this.TempFiles.Clear();
+            }
         }
     }
 }

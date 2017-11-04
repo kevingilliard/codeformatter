@@ -137,11 +137,25 @@ namespace Microsoft.DotNet.CodeFormatting
             var watch = new Stopwatch();
 
             var converter = new ProjectConverter();
-            var originalWorkspace = workspace;
+            Workspace originalWorkspace = workspace;
+
+            // Update solution and reload workspace if it needs update.  (In mono version of MSBuild)
+            if (converter.NeedsUpdate(workspace.CurrentSolution))
+            {
+                originalWorkspace = await converter.UpdateSolutionAsync(workspace.CurrentSolution, cancellationToken);
+            }
+
+            // Determine whether prints each project name or not
+            // If solution has file path, we're formatting all projects under solution
+            // In that case, we can print each project file name
+            bool bPrintProjectName = (originalWorkspace.CurrentSolution.FilePath != null);
 
             bool bFailToSave = false;
             foreach (var project in originalWorkspace.CurrentSolution.Projects)
             {
+                if (bPrintProjectName)
+                    FormatLogger.WriteLine("  {0}", Path.GetFileName(project.FilePath));
+
                 watch.Start();
 
                 // Get document list to be formatted
@@ -167,8 +181,13 @@ namespace Microsoft.DotNet.CodeFormatting
                 if (!workspace.TryApplyChanges(solution))
                     bFailToSave = true;
 
-                converter.ClearTempFiles();
+                // Clear workspace if it's updated version
+                if (workspace != originalWorkspace)
+                    converter.ClearWorkspace(workspace);
             }
+
+            // Clear workspace if it's from converted solution
+            converter.ClearWorkspace(originalWorkspace);
 
             if (bFailToSave)
             {
