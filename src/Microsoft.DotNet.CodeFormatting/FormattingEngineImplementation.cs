@@ -183,13 +183,13 @@ namespace Microsoft.DotNet.CodeFormatting
                 if (!workspace.TryApplyChanges(solution))
                     bFailToSave = true;
 
-                // Clear workspace if it's updated version
-                if (workspace != originalWorkspace)
-                    converter.ClearWorkspace(workspace);
+                //// Clear workspace if it's updated version
+                //if (workspace != originalWorkspace)
+                //    converter.ClearWorkspace(workspace);
             }
 
-            // Clear workspace if it's from converted solution
-            converter.ClearWorkspace(originalWorkspace);
+            //// Clear workspace if it's from converted solution
+            //converter.ClearWorkspace(originalWorkspace);
 
             if (bFailToSave)
             {
