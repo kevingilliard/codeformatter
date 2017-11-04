@@ -237,7 +237,7 @@ namespace Microsoft.DotNet.CodeFormatting
                 // Create solution file content and save as temporary file
                 string tmpSolutionPath = solution.FilePath.Insert(solution.FilePath.LastIndexOf('.'), "_tmp");
                 string solutionString = File.ReadAllText(solution.FilePath);
-                solutionString.Replace('\\', '/');
+                solutionString = solutionString.Replace('\\', '/');
 
                 File.WriteAllText(tmpSolutionPath, solutionString);
 

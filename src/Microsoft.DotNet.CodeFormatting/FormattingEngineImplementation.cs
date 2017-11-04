@@ -143,14 +143,12 @@ namespace Microsoft.DotNet.CodeFormatting
             if (converter.NeedsUpdate(workspace.CurrentSolution))
             {
                 originalWorkspace = await converter.UpdateSolutionAsync(workspace.CurrentSolution, cancellationToken);
-                FormatLogger.WriteLine("== Project was updated: {0}", originalWorkspace.CurrentSolution.FilePath);
             }
 
             // Determine whether prints each project name or not
             // If solution has file path, we're formatting all projects under solution
             // In that case, we can print each project file name
             bool bPrintProjectName = (originalWorkspace.CurrentSolution.FilePath != null);
-            FormatLogger.WriteLine("=== Print project name");
 
             bool bFailToSave = false;
             foreach (var project in originalWorkspace.CurrentSolution.Projects)
